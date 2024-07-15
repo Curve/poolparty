@@ -67,4 +67,4 @@ int main()
 
 It's also possible to use a `std::priority_queue` for more fine grained execution, see [tests](tests/priority.test.cpp):
 
-https://github.com/Curve/poolparty/blob/master/tests/priority.test.cpp#L48-L62
+https://github.com/Curve/poolparty/blob/4f58b719c99238985c1e99be6b07f893cfbd9c50/tests/priority.test.cpp#L48-L62
