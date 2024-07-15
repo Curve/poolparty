@@ -30,6 +30,7 @@ _poolparty_ is a simple and versatile C++20 thread-pool library.
 ## 📖 Examples
 
 ```cpp
+#include <iostream>
 #include <poolparty/pool.hpp>
 
 int expensive_calculation(int x)
@@ -51,6 +52,9 @@ int main()
     // Let's add an additional thread
     auto source = pool.add_thread();
     auto fut3   = pool.submit(expensive_calculation, 3);
+
+    // Fire and forget
+    pool.submit<true>([]() { expensive_calculation(100); });
 
     // Resume execution
     pool.resume();
