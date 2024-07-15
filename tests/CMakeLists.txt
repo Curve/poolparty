@@ -33,6 +33,7 @@ CPMFindPackage(
   NAME           ut
   GIT_TAG        fb06064
   GIT_REPOSITORY "https://github.com/boost-ext/ut"
+  OPTIONS        "BOOST_UT_DISABLE_MODULE ON"
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE Boost::ut cr::poolparty)
