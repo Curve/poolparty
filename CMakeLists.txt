@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(poolparty LANGUAGES CXX VERSION 1.0)
+project(poolparty LANGUAGES CXX VERSION 1.0.1)
 
 # --------------------------------------------------------------------------------------------------------
 # Library options

@@ -29,7 +29,7 @@ namespace poolparty
     class pool
     {
         using queue     = Queue<Task, Ts...>;
-        using interface = interface<queue>;
+        using interface = poolparty::interface<queue>;
 
       private:
         queue m_queue;
