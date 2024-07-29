@@ -1,13 +1,15 @@
 #include <boost/ut.hpp>
 
-#include <vector>
 #include <poolparty/pool.hpp>
+
+#include <vector>
+#include <algorithm>
 
 using namespace boost::ut;
 
 struct priority_task
 {
-    std::function<void()> callback;
+    std::move_only_function<void()> callback;
     std::size_t priority;
 
   public:
@@ -22,21 +24,32 @@ struct priority_task
     }
 };
 
+// `std::priority_queue` does not play nice with move-only elements.
+// This is a problem as the internally used task captures move-only objects.
+
 template <typename... Ts>
-struct poolparty::interface<std::priority_queue<Ts...>>
+struct poolparty::traits<std::vector<Ts...>>
 {
-    using queue_t = std::priority_queue<Ts...>;
+    using queue_t = std::vector<Ts...>;
+
+    static bool empty(queue_t &queue)
+    {
+        return queue.empty();
+    };
 
     template <typename... As>
     static void emplace(queue_t &queue, As &&...arguments)
     {
-        queue.emplace(std::forward<As>(arguments)...);
+        queue.emplace_back(std::forward<As>(arguments)...);
+        std::push_heap(queue.begin(), queue.end());
     };
 
     static auto pop(queue_t &queue)
     {
-        auto rtn = std::move(queue.top());
-        queue.pop();
+        std::pop_heap(queue.begin(), queue.end());
+
+        auto rtn = std::move(queue.back());
+        queue.pop_back();
 
         return rtn;
     };
@@ -45,7 +58,7 @@ struct poolparty::interface<std::priority_queue<Ts...>>
 // NOLINTNEXTLINE
 suite<"priority"> priority_test = []()
 {
-    poolparty::pool<std::priority_queue, priority_task> pool{1};
+    poolparty::pool<std::vector, priority_task> pool{1};
 
     expect(eq(pool.size(), 1));
     expect(eq(pool.tasks(), 0));

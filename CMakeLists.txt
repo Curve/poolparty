@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(poolparty LANGUAGES CXX VERSION 1.0.1)
+project(poolparty LANGUAGES CXX VERSION 2.0.0)
 
 # --------------------------------------------------------------------------------------------------------
 # Library options
@@ -14,8 +14,8 @@ option(poolparty_tests "Build tests" OFF)
 add_library(${PROJECT_NAME} INTERFACE)
 add_library(cr::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
-target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_20)
-set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20 CXX_EXTENSIONS OFF CXX_STANDARD_REQUIRED ON)
+target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_23)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 23 CXX_EXTENSIONS OFF CXX_STANDARD_REQUIRED ON)
 
 # --------------------------------------------------------------------------------------------------------
 # Include "include" folder

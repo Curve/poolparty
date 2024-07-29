@@ -8,8 +8,13 @@
 namespace poolparty
 {
     template <typename T>
-    struct interface
+    struct traits
     {
+        static bool empty(T &queue)
+        {
+            return queue.empty();
+        };
+
         template <typename... Ts>
         static void emplace(T &queue, Ts &&...arguments)
         {
@@ -37,13 +42,14 @@ namespace poolparty
     template <template <typename...> class Queue, task_like Task, typename... Ts>
     pool<Queue, Task, Ts...>::~pool()
     {
-        std::lock_guard guard{m_threads_mutex};
+        std::unique_lock lock{m_mutex};
 
         for (auto &thread : m_threads)
         {
             thread.request_stop();
         }
 
+        lock.unlock();
         m_cond.notify_all();
     }
 
@@ -52,37 +58,42 @@ namespace poolparty
     {
         auto pred = [this, &token]()
         {
-            return token.stop_requested() || (!m_pause && !m_queue.empty());
+            return token.stop_requested() || (!m_pause && !traits::empty(m_queue));
         };
 
         while (true)
         {
-            Task task{};
+            std::unique_lock lock{m_mutex};
+            m_cond.wait(lock, pred);
+
+            if (token.stop_requested())
             {
-                std::unique_lock lock{m_queue_mutex};
-                m_cond.wait(lock, pred);
-
-                if (token.stop_requested())
-                {
-                    return;
-                }
-
-                task = std::move(interface::pop(m_queue));
+                break;
             }
+
+            auto task = traits::pop(m_queue);
+            lock.unlock();
+
             std::invoke(task);
         }
+
+        m_cond.notify_all();
     }
 
     template <template <typename...> class Queue, task_like Task, typename... Ts>
     void pool<Queue, Task, Ts...>::pause()
     {
-        m_pause.store(true);
+        std::lock_guard lock{m_mutex};
+        m_pause = true;
     }
 
     template <template <typename...> class Queue, task_like Task, typename... Ts>
     void pool<Queue, Task, Ts...>::resume()
     {
-        m_pause.store(false);
+        {
+            std::lock_guard lock{m_mutex};
+            m_pause = false;
+        }
         m_cond.notify_all();
     }
 
@@ -91,10 +102,9 @@ namespace poolparty
     void pool<Queue, Task, Ts...>::emplace(As &&...arguments)
     {
         {
-            std::lock_guard lock{m_queue_mutex};
-            interface::emplace(m_queue, std::forward<As>(arguments)...);
+            std::lock_guard lock{m_mutex};
+            traits::emplace(m_queue, std::forward<As>(arguments)...);
         }
-
         m_cond.notify_one();
     }
 
@@ -104,17 +114,30 @@ namespace poolparty
     {
         if constexpr (!Forget)
         {
-            using task_t = decltype(std::packaged_task{std::forward<Func>(callback)});
-            auto ptr     = std::make_shared<task_t>(std::forward<Func>(callback));
+            using result_t = std::invoke_result_t<Func, As...>;
 
-            auto task = [ptr, ... arguments = std::forward<As>(arguments)]()
+            auto promise = std::promise<result_t>{};
+            auto rtn     = promise.get_future();
+
+            // MSVC has a broken `std::packaged_task` implementation. Thus we're doing things manually here.
+
+            auto fn = [promise = std::move(promise), callback = std::forward<Func>(callback),
+                       ... arguments = std::forward<As>(arguments)] mutable
             {
-                std::invoke(*ptr, arguments...);
+                if constexpr (not std::is_void_v<result_t>)
+                {
+                    promise.set_value(std::invoke(callback, arguments...));
+                }
+                else
+                {
+                    std::invoke(callback, arguments...);
+                    promise.set_value();
+                }
             };
 
-            emplace(std::move(task), TaskParams...);
+            emplace(std::move(fn), TaskParams...);
 
-            return ptr->get_future();
+            return rtn;
         }
         else
         {
@@ -130,7 +153,7 @@ namespace poolparty
     template <template <typename...> class Queue, task_like Task, typename... Ts>
     std::stop_source pool<Queue, Task, Ts...>::add_thread()
     {
-        std::lock_guard guard{m_threads_mutex};
+        std::lock_guard lock{m_mutex};
 
         auto thread = [this](std::stop_token token)
         {
@@ -143,39 +166,43 @@ namespace poolparty
     template <template <typename...> class Queue, task_like Task, typename... Ts>
     void pool<Queue, Task, Ts...>::cleanup()
     {
-        m_cond.notify_all();
-
-        std::lock_guard guard{m_threads_mutex};
+        std::unique_lock lock{m_mutex};
+        std::vector<std::jthread> pending;
 
         for (auto it = m_threads.begin(); it != m_threads.end();)
         {
-            if (it->get_stop_token().stop_requested())
+            if (!it->get_stop_token().stop_requested())
             {
-                it = m_threads.erase(it);
+                ++it;
                 continue;
             }
 
-            ++it;
+            pending.emplace_back(std::move(*it));
+            it = m_threads.erase(it);
         }
+
+        lock.unlock();
+        m_cond.notify_all();
     }
 
     template <template <typename...> class Queue, task_like Task, typename... Ts>
     bool pool<Queue, Task, Ts...>::paused() const
     {
-        return m_pause.load();
+        std::lock_guard lock{m_mutex};
+        return m_pause;
     }
 
     template <template <typename...> class Queue, task_like Task, typename... Ts>
-    std::size_t pool<Queue, Task, Ts...>::size()
+    std::size_t pool<Queue, Task, Ts...>::size() const
     {
-        std::lock_guard guard{m_threads_mutex};
+        std::lock_guard lock{m_mutex};
         return m_threads.size();
     }
 
     template <template <typename...> class Queue, task_like Task, typename... Ts>
-    std::size_t pool<Queue, Task, Ts...>::tasks()
+    std::size_t pool<Queue, Task, Ts...>::tasks() const
     {
-        std::lock_guard guard{m_queue_mutex};
+        std::lock_guard lock{m_mutex};
         return m_queue.size();
     }
 } // namespace poolparty

@@ -4,12 +4,10 @@
 #include <cstddef>
 #include <functional>
 
-#include <atomic>
-#include <thread>
-
 #include <concepts>
 #include <type_traits>
 
+#include <thread>
 #include <stop_token>
 #include <condition_variable>
 
@@ -17,31 +15,30 @@ namespace poolparty
 {
     template <typename T>
     concept task_like = requires() {
-        requires std::is_move_constructible_v<T>;
+        requires not std::copyable<T>;
         requires std::is_default_constructible_v<T>;
-        requires std::constructible_from<T, std::function<void()>>;
     };
 
     template <typename T>
-    struct interface;
+    struct traits;
 
-    template <template <typename...> class Queue = std::queue, task_like Task = std::function<void()>, typename... Ts>
+    template <template <typename...> class Queue = std::queue, task_like Task = std::move_only_function<void()>,
+              typename... Ts>
     class pool
     {
-        using queue     = Queue<Task, Ts...>;
-        using interface = poolparty::interface<queue>;
+        using queue  = Queue<Task, Ts...>;
+        using traits = poolparty::traits<queue>;
+
+      private:
+        mutable std::mutex m_mutex;
+        std::condition_variable m_cond;
+
+      private:
+        bool m_pause{false};
 
       private:
         queue m_queue;
-        std::mutex m_queue_mutex;
-
-      private:
-        std::mutex m_threads_mutex;
         std::vector<std::jthread> m_threads;
-
-      private:
-        std::atomic_bool m_pause;
-        std::condition_variable m_cond;
 
       public:
         pool(std::size_t = std::thread::hardware_concurrency());
@@ -74,8 +71,8 @@ namespace poolparty
         [[nodiscard]] bool paused() const;
 
       public:
-        [[nodiscard]] std::size_t size();
-        [[nodiscard]] std::size_t tasks();
+        [[nodiscard]] std::size_t size() const;
+        [[nodiscard]] std::size_t tasks() const;
     };
 } // namespace poolparty
 
