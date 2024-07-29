@@ -12,7 +12,7 @@ _poolparty_ is a simple and versatile C++20 thread-pool library.
   ```cmake
   CPMFindPackage(
     NAME           poolparty
-    VERSION        1.0.0
+    VERSION        2.0.0
     GIT_REPOSITORY "https://github.com/Curve/poolparty"
   )
   ```
@@ -21,7 +21,7 @@ _poolparty_ is a simple and versatile C++20 thread-pool library.
   ```cmake
   include(FetchContent)
 
-  FetchContent_Declare(poolparty GIT_REPOSITORY "https://github.com/Curve/poolparty" GIT_TAG v1.0.0)
+  FetchContent_Declare(poolparty GIT_REPOSITORY "https://github.com/Curve/poolparty" GIT_TAG v2.0.0)
   FetchContent_MakeAvailable(poolparty)
 
   target_link_libraries(<target> cr::poolparty)
@@ -69,6 +69,6 @@ int main()
 }
 ```
 
-It's also possible to use a `std::priority_queue` for more fine grained execution, see [tests](tests/priority.test.cpp):
+It's also possible to use a priority queue for more fine grained execution, see [tests](tests/priority.test.cpp):
 
 https://github.com/Curve/poolparty/blob/4f58b719c99238985c1e99be6b07f893cfbd9c50/tests/priority.test.cpp#L48-L62
