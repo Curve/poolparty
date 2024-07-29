@@ -122,7 +122,7 @@ namespace poolparty
             // MSVC has a broken `std::packaged_task` implementation. Thus we're doing things manually here.
 
             auto fn = [promise = std::move(promise), callback = std::forward<Func>(callback),
-                       ... arguments = std::forward<As>(arguments)] mutable
+                       ... arguments = std::forward<As>(arguments)]() mutable
             {
                 if constexpr (not std::is_void_v<result_t>)
                 {
