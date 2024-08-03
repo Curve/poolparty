@@ -67,12 +67,12 @@ suite<"priority"> priority_test = []()
 
     std::vector<int> order;
 
-    auto fut0 = pool.submit<false, 1>([&]() { order.emplace_back(1); });
-    auto fut1 = pool.submit<false, 2>([&]() { order.emplace_back(2); });
-    auto fut2 = pool.submit<false, 3>([&]() { order.emplace_back(3); });
-    auto fut5 = pool.submit<false, 6>([&]() { order.emplace_back(6); });
-    auto fut3 = pool.submit<false, 4>([&]() { order.emplace_back(4); });
-    auto fut4 = pool.submit<false, 5>([&]() { order.emplace_back(5); });
+    auto fut0 = pool.submit<1>([&]() { order.emplace_back(1); });
+    auto fut1 = pool.submit<2>([&]() { order.emplace_back(2); });
+    auto fut2 = pool.submit<3>([&]() { order.emplace_back(3); });
+    auto fut5 = pool.submit<6>([&]() { order.emplace_back(6); });
+    auto fut3 = pool.submit<4>([&]() { order.emplace_back(4); });
+    auto fut4 = pool.submit<5>([&]() { order.emplace_back(5); });
 
     pool.resume();
 

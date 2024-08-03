@@ -1,8 +1,8 @@
 #pragma once
 
 #include "pool.hpp"
+#include "task.hpp"
 
-#include <future>
 #include <utility>
 
 namespace poolparty
@@ -30,7 +30,7 @@ namespace poolparty
         };
     };
 
-    template <template <typename...> class Queue, task_like Task, typename... Ts>
+    template <template <typename...> class Queue, impl::task_like Task, typename... Ts>
     pool<Queue, Task, Ts...>::pool(std::size_t threads)
     {
         for (auto i = 0u; threads > i; i++)
@@ -39,7 +39,7 @@ namespace poolparty
         }
     }
 
-    template <template <typename...> class Queue, task_like Task, typename... Ts>
+    template <template <typename...> class Queue, impl::task_like Task, typename... Ts>
     pool<Queue, Task, Ts...>::~pool()
     {
         std::unique_lock lock{m_mutex};
@@ -53,7 +53,7 @@ namespace poolparty
         m_cond.notify_all();
     }
 
-    template <template <typename...> class Queue, task_like Task, typename... Ts>
+    template <template <typename...> class Queue, impl::task_like Task, typename... Ts>
     void pool<Queue, Task, Ts...>::worker(std::stop_token token)
     {
         auto pred = [this, &token]()
@@ -80,14 +80,14 @@ namespace poolparty
         m_cond.notify_all();
     }
 
-    template <template <typename...> class Queue, task_like Task, typename... Ts>
+    template <template <typename...> class Queue, impl::task_like Task, typename... Ts>
     void pool<Queue, Task, Ts...>::pause()
     {
         std::lock_guard lock{m_mutex};
         m_pause = true;
     }
 
-    template <template <typename...> class Queue, task_like Task, typename... Ts>
+    template <template <typename...> class Queue, impl::task_like Task, typename... Ts>
     void pool<Queue, Task, Ts...>::resume()
     {
         {
@@ -97,7 +97,7 @@ namespace poolparty
         m_cond.notify_all();
     }
 
-    template <template <typename...> class Queue, task_like Task, typename... Ts>
+    template <template <typename...> class Queue, impl::task_like Task, typename... Ts>
     template <typename... As>
     void pool<Queue, Task, Ts...>::emplace(As &&...arguments)
     {
@@ -108,49 +108,38 @@ namespace poolparty
         m_cond.notify_one();
     }
 
-    template <template <typename...> class Queue, task_like Task, typename... Ts>
-    template <bool Forget, auto... TaskParams, typename Func, typename... As>
+    template <template <typename...> class Queue, impl::task_like Task, typename... Ts>
+    template <auto... TaskParams, typename Func, typename... As>
     auto pool<Queue, Task, Ts...>::submit(Func &&callback, As &&...arguments)
     {
-        if constexpr (!Forget)
+        auto task = packaged_task{std::forward<Func>(callback)};
+        auto fut  = task.get_future();
+
+        auto fn = [task = std::move(task), ... arguments = std::forward<As>(arguments)]() mutable
         {
-            using result_t = std::invoke_result_t<Func, As...>;
+            std::invoke(task, arguments...);
+        };
 
-            auto promise = std::promise<result_t>{};
-            auto rtn     = promise.get_future();
+        emplace(std::move(fn), TaskParams...);
 
-            // MSVC has a broken `std::packaged_task` implementation. Thus we're doing things manually here.
-
-            auto fn = [promise = std::move(promise), callback = std::forward<Func>(callback),
-                       ... arguments = std::forward<As>(arguments)]() mutable
-            {
-                if constexpr (not std::is_void_v<result_t>)
-                {
-                    promise.set_value(std::invoke(callback, arguments...));
-                }
-                else
-                {
-                    std::invoke(callback, arguments...);
-                    promise.set_value();
-                }
-            };
-
-            emplace(std::move(fn), TaskParams...);
-
-            return rtn;
-        }
-        else
-        {
-            auto task = [callback = std::forward<Func>(callback), ... arguments = std::forward<As>(arguments)]()
-            {
-                std::invoke(callback, arguments...);
-            };
-
-            emplace(std::move(task), TaskParams...);
-        }
+        return fut;
     }
 
-    template <template <typename...> class Queue, task_like Task, typename... Ts>
+    template <template <typename...> class Queue, impl::task_like Task, typename... Ts>
+    template <auto... TaskParams, typename Func, typename... As>
+    void pool<Queue, Task, Ts...>::forget(Func &&callback, As &&...arguments)
+    {
+        auto task = packaged_task{std::forward<Func>(callback)};
+
+        auto fn = [task = std::move(task), ... arguments = std::forward<As>(arguments)]() mutable
+        {
+            std::invoke(task, arguments...);
+        };
+
+        emplace(std::move(fn), TaskParams...);
+    }
+
+    template <template <typename...> class Queue, impl::task_like Task, typename... Ts>
     std::stop_source pool<Queue, Task, Ts...>::add_thread()
     {
         std::lock_guard lock{m_mutex};
@@ -163,7 +152,7 @@ namespace poolparty
         return m_threads.emplace_back(thread).get_stop_source();
     }
 
-    template <template <typename...> class Queue, task_like Task, typename... Ts>
+    template <template <typename...> class Queue, impl::task_like Task, typename... Ts>
     void pool<Queue, Task, Ts...>::cleanup()
     {
         std::unique_lock lock{m_mutex};
@@ -185,21 +174,21 @@ namespace poolparty
         m_cond.notify_all();
     }
 
-    template <template <typename...> class Queue, task_like Task, typename... Ts>
+    template <template <typename...> class Queue, impl::task_like Task, typename... Ts>
     bool pool<Queue, Task, Ts...>::paused() const
     {
         std::lock_guard lock{m_mutex};
         return m_pause;
     }
 
-    template <template <typename...> class Queue, task_like Task, typename... Ts>
+    template <template <typename...> class Queue, impl::task_like Task, typename... Ts>
     std::size_t pool<Queue, Task, Ts...>::size() const
     {
         std::lock_guard lock{m_mutex};
         return m_threads.size();
     }
 
-    template <template <typename...> class Queue, task_like Task, typename... Ts>
+    template <template <typename...> class Queue, impl::task_like Task, typename... Ts>
     std::size_t pool<Queue, Task, Ts...>::tasks() const
     {
         std::lock_guard lock{m_mutex};

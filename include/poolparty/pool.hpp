@@ -13,16 +13,19 @@
 
 namespace poolparty
 {
-    template <typename T>
-    concept task_like = requires() {
-        requires not std::copyable<T>;
-        requires std::is_default_constructible_v<T>;
-    };
+    namespace impl
+    {
+        template <typename T>
+        concept task_like = requires() {
+            requires not std::copyable<T>;
+            requires std::is_default_constructible_v<T>;
+        };
+    } // namespace impl
 
     template <typename T>
     struct traits;
 
-    template <template <typename...> class Queue = std::queue, task_like Task = std::move_only_function<void()>,
+    template <template <typename...> class Queue = std::queue, impl::task_like Task = std::move_only_function<void()>,
               typename... Ts>
     class pool
     {
@@ -58,8 +61,11 @@ namespace poolparty
         void emplace(As &&...);
 
       public:
-        template <bool Forget = false, auto... TaskParams, typename Func, typename... As>
+        template <auto... TaskParams, typename Func, typename... As>
         [[nodiscard]] auto submit(Func &&, As &&...);
+
+        template <auto... TaskParams, typename Func, typename... As>
+        void forget(Func &&, As &&...);
 
       public:
         std::stop_source add_thread();

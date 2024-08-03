@@ -1,3 +1,4 @@
+#include "poolparty/task.hpp"
 #include <boost/ut.hpp>
 #include <poolparty/pool.hpp>
 
@@ -28,8 +29,24 @@ suite<"basic"> basic_test = []()
     {
         std::promise<bool> done;
 
-        pool.submit<true>([&]() { done.set_value(true); });
+        pool.forget([&]() { done.set_value(true); });
         expect(done.get_future().get());
+    }
+
+    {
+        std::promise<bool> done;
+        auto fut = done.get_future();
+
+        pool.submit([done = std::move(done)]() mutable { done.set_value(true); }).wait();
+        expect(fut.get());
+    }
+
+    {
+        std::promise<bool> done;
+        auto fut = done.get_future();
+
+        pool.forget([done = std::move(done)]() mutable { done.set_value(true); });
+        expect(fut.get());
     }
 
     {
