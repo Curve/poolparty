@@ -6,6 +6,9 @@
 
 _poolparty_ is a simple and versatile C++20 thread-pool library.
 
+> [!NOTE]
+> This library does not handle exceptions. Please make sure to not throw from within tasks!
+
 ## 📦 Installation
 
 * Using [CPM](https://github.com/cpm-cmake/CPM.cmake)
