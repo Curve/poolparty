@@ -1,4 +1,3 @@
-#include "poolparty/task.hpp"
 #include <boost/ut.hpp>
 #include <poolparty/pool.hpp>
 
@@ -54,6 +53,41 @@ suite<"basic"> basic_test = []()
 
         pool.emplace([&]() { done.set_value(true); });
         expect(done.get_future().get());
+    }
+
+    {
+        std::promise<bool> done;
+        auto fut = done.get_future();
+
+        pool.submit([done = std::move(done)](int) mutable { done.set_value(true); }, 10).wait();
+        expect(fut.get());
+    }
+
+    {
+        std::promise<bool> done;
+        auto fut = done.get_future();
+
+        pool.forget([done = std::move(done)](int) mutable { done.set_value(true); }, 10);
+        expect(fut.get());
+    }
+
+    {
+        std::promise<bool> done;
+        auto fut = done.get_future();
+
+        pool.submit([done = std::move(done)](std::unique_ptr<int>) mutable { done.set_value(true); },
+                    std::make_unique<int>(10))
+            .wait();
+        expect(fut.get());
+    }
+
+    {
+        std::promise<bool> done;
+        auto fut = done.get_future();
+
+        pool.forget([done = std::move(done)](std::unique_ptr<int>) mutable { done.set_value(true); },
+                    std::make_unique<int>(10));
+        expect(fut.get());
     }
 
     auto source = pool.add_thread();

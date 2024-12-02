@@ -117,7 +117,7 @@ namespace poolparty
 
         auto fn = [task = std::move(task), ... arguments = std::forward<As>(arguments)]() mutable
         {
-            std::invoke(task, arguments...);
+            std::invoke(task, std::move_if_noexcept(arguments)...);
         };
 
         emplace(std::move(fn), TaskParams...);
@@ -133,7 +133,7 @@ namespace poolparty
 
         auto fn = [task = std::move(task), ... arguments = std::forward<As>(arguments)]() mutable
         {
-            std::invoke(task, arguments...);
+            std::invoke(task, std::move_if_noexcept(arguments)...);
         };
 
         emplace(std::move(fn), TaskParams...);
